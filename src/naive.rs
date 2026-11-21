@@ -6,7 +6,7 @@ const LINE_HEIGHT: f64 = 52.0;
 const SCROLL_LANES: usize = 15;
 const FIXED_LANES: usize = 8;
 
-pub(crate) fn render(comments: &[Comment], style: RenderStyle) -> String {
+pub(crate) fn render(comments: &[Comment], style: RenderStyle, escape: ass::Escape) -> String {
     let mut output = ass::header(style);
     let height = ass::region_height(style);
     let margin = TOP_MARGIN.min((height / 8.0).floor());
@@ -28,7 +28,7 @@ pub(crate) fn render(comments: &[Comment], style: RenderStyle) -> String {
         let Some(motion) = comment.motion() else {
             continue;
         };
-        let text = ass::escape_text(&comment.text);
+        let text = ass::escape_text(&comment.text, escape);
         if text.is_empty() {
             continue;
         }

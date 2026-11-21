@@ -139,3 +139,16 @@ fn compact_keeps_literal_ass_controls_in_the_comment_text() {
     assert_eq!(events.len(), 1);
     assert!(events[0].ends_with("literal ＼N and ｛＼pos(0,900)｝"));
 }
+
+#[test]
+fn naive_protects_literal_ass_escapes_and_keeps_the_legacy_entry_point() {
+    let xml = r#"<i><d p="1,5,25,0">literal \N \n \&#9;h&#10;actual newline</d></i>"#;
+    let options = RenderOptions::for_mode(RenderMode::Naive);
+    let strict = render_bilibili_xml(xml, &options).unwrap();
+    let legacy = render_legacy_bilibili_xml(xml);
+    assert!(
+        events(&strict)[0]
+            .ends_with("literal \\\u{2060}N \\\u{2060}n \\\u{2060}h\\Nactual newline")
+    );
+    assert!(events(&legacy)[0].ends_with(r"literal \\N \\n \\h\Nactual newline"));
+}

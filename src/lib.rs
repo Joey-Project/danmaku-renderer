@@ -139,7 +139,11 @@ pub fn render_bilibili_xml(xml: &str, options: &RenderOptions) -> Result<String,
         RenderMode::Naive => {
             validate_style(options.style)?;
             let comments = xml::parse(xml)?;
-            Ok(naive::render(&comments, options.style))
+            Ok(naive::render(
+                &comments,
+                options.style,
+                ass::Escape::Literal,
+            ))
         }
         RenderMode::Compact => render_compact_ass(xml, options).map(|rendered| rendered.ass),
     }
@@ -205,7 +209,11 @@ fn validate_style(style: RenderStyle) -> Result<(), RenderError> {
 /// Use this entry point for compatibility with BBDown's legacy update path.
 #[must_use]
 pub fn render_legacy_bilibili_xml(xml: &str) -> String {
-    naive::render(&xml::parse_legacy(xml), StylePreset::Original.into())
+    naive::render(
+        &xml::parse_legacy(xml),
+        StylePreset::Original.into(),
+        ass::Escape::Legacy,
+    )
 }
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]

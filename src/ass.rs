@@ -82,16 +82,32 @@ pub(crate) fn ass_color(color: u32) -> String {
     format!("&H{blue:02X}{green:02X}{red:02X}&")
 }
 
-pub(crate) fn escape_text(text: &str) -> String {
+#[derive(Clone, Copy)]
+pub(crate) enum Escape {
+    Literal,
+    Legacy,
+}
+
+pub(crate) fn escape_text(text: &str, escape: Escape) -> String {
     let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
     let mut output = String::with_capacity(normalized.len());
-    for character in normalized.chars() {
+    let mut characters = normalized
+        .chars()
+        .filter(|character| *character == '\n' || !character.is_control())
+        .peekable();
+    while let Some(character) = characters.next() {
         match character {
             '\n' => output.push_str("\\N"),
+            // A word joiner keeps the visible backslash while separating it
+            // from a letter that would otherwise start an ASS escape.
+            '\\' if matches!(escape, Escape::Literal)
+                && matches!(characters.peek(), Some('N' | 'n' | 'h')) =>
+            {
+                output.push_str("\\\u{2060}");
+            }
             '\\' => output.push_str(r"\\"),
             '{' => output.push_str("\\{"),
             '}' => output.push_str("\\}"),
-            character if character.is_control() => {}
             character => output.push(character),
         }
     }

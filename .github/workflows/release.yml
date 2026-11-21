@@ -4,9 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Cargo package version to publish
-        required: true
+        description: Cargo package version (required when publishing)
+        required: false
         type: string
+      oidc_check_only:
+        description: Verify Crates.io OIDC authentication without publishing
+        type: boolean
+        default: false
       bootstrap:
         description: Use the environment token for the initial publication
         type: boolean
@@ -20,9 +24,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  oidc-check:
+    name: Check Crates.io OIDC
+    if: github.ref == 'refs/heads/master' && inputs.oidc_check_only
+    runs-on: ubuntu-latest
+    environment: crates-io
+    permissions:
+      id-token: write
+    steps:
+      - uses: rust-lang/crates-io-auth-action@v1
+
   verify:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' && !inputs.oidc_check_only
     outputs:
       sha: ${{ steps.version.outputs.sha }}
     steps:
@@ -49,6 +63,7 @@ jobs:
       - run: cargo +1.95.0 publish --dry-run --locked --all-features
 
   publish:
+    if: ${{ !inputs.oidc_check_only }}
     needs: verify
     runs-on: ubuntu-latest
     environment: crates-io

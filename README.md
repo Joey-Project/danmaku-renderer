@@ -55,4 +55,6 @@ The golden tests compare two [Bilibili fixtures](tests/fixtures/README.md) again
 
 On GitHub, the publish workflow accepts a version from `master`, verifies the matching `v<version>` tag and Cargo package, and publishes from the protected `crates-io` environment. Set `CARGO_REGISTRY_TOKEN` in that environment for the first release and select `bootstrap` when dispatching. Subsequent releases use Trusted Publishing for `Joey-Project/danmaku-renderer`, `release.yml`, and the `crates-io` environment. Remove the bootstrap credential after the initial publication.
 
+To test Trusted Publishing, run **Publish to crates.io** from `master` with `oidc_check_only` enabled and leave `version` blank. After environment approval, the check requests a temporary token. The package verification and publication jobs are skipped.
+
 Licensed under MIT. Original placement comes from [BBDown-rust](https://github.com/Joey-Project/BBDown-rust/commit/7c3e54d). Compact grouping and lookahead come from [Telegram-Video-Downloader](https://github.com/Joey-Project/Telegram-Video-Downloader/commit/9d0a5c3c82ffa957cbf33cbdf07dfba059e2cbdd).

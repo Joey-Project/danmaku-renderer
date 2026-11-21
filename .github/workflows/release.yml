@@ -1,0 +1,73 @@
+name: Publish to crates.io
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Cargo package version to publish
+        required: true
+        type: string
+      bootstrap:
+        description: Use the environment token for the initial publication
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crates-io-release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    outputs:
+      sha: ${{ steps.version.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: rustup toolchain install 1.95.0 --profile minimal
+      - name: Verify the release tag and version
+        id: version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          sha=$(git rev-parse --verify "refs/tags/v${VERSION}^{commit}")
+          git merge-base --is-ancestor "$sha" "$GITHUB_SHA"
+          git checkout --detach "$sha"
+          actual=$(cargo +1.95.0 metadata --locked --no-deps --format-version=1 |
+            jq -er '.packages[] | select(.name == "danmaku-renderer") | .version')
+          test "$actual" = "$VERSION"
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+      - run: cargo +1.95.0 test --locked --all-features
+      - run: cargo +1.95.0 publish --dry-run --locked --all-features
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: crates-io
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
+      - run: rustup toolchain install 1.95.0 --profile minimal
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+        if: ${{ !inputs.bootstrap }}
+      - name: Publish the verified tag
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ inputs.bootstrap && secrets.CARGO_REGISTRY_TOKEN || steps.auth.outputs.token }}
+        run: |
+          set -euo pipefail
+          test -n "$CARGO_REGISTRY_TOKEN"
+          cargo +1.95.0 publish --locked --all-features

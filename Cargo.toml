@@ -1,0 +1,36 @@
+[package]
+name = "danmaku-renderer"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+description = "Render Bilibili XML danmaku as Advanced SubStation Alpha subtitles"
+repository = "https://github.com/Joey-Project/danmaku-renderer"
+license = "MIT"
+readme = "README.md"
+keywords = ["danmaku", "bilibili", "subtitles", "ass"]
+categories = ["multimedia", "command-line-utilities"]
+include = [
+    "/Cargo.lock",
+    "/Cargo.toml",
+    "/LICENSE",
+    "/README.md",
+    "/src/**",
+    "/tests/**",
+]
+
+[features]
+default = []
+cli = ["dep:clap"]
+
+[dependencies]
+anyhow = "1.0"
+roxmltree = "0.21.1"
+clap = { version = "4.5", features = ["derive"], optional = true }
+
+[dev-dependencies]
+flate2 = "1.1"
+
+[[bin]]
+name = "danmaku-renderer"
+path = "src/main.rs"
+required-features = ["cli"]

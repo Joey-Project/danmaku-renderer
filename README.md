@@ -1,99 +1,58 @@
-# Codex-Gated Repository Template
+# danmaku-renderer
 
-This template starts a repository with the Codex review gate v2 workflows on
-the default branch. It also includes a modular CI generator for adding
-project-specific formatter, linter, test, and benchmark entrypoints after a
-repository is created from the template.
+Convert Bilibili XML danmaku to Advanced SubStation Alpha (ASS). The Rust library is available with no CLI dependencies. The optional command uses the same renderer.
 
-## Included
+## Install and use the CLI
 
-- `.github/workflows/codex-review-gate.yml` (read-only pull-request verifier)
-- `.github/workflows/codex-review-gate-controller.yml` (review-event and manual controller)
-- `.github/CODEOWNERS` (control-plane ownership)
-- `rulesets/codex-review-gate.json` (Disabled v2 ruleset import template)
-- `.gitignore`
-- `scripts/setup-ci.mjs`
-- this README
-
-The verifier uses `JoeyTeng/codex-review-gate-action@v2` and produces the native
-`codex/github-review-gate` check for each ready pull request head. The separate
-controller handles official Codex comments and exact-head manual reconciliation;
-it has no scheduled job. The floating major-version reference is intentional:
-compatible v2 releases can reach consumers without changing each repository.
-The included ruleset file is only an import template; copying it does not
-activate repository protection.
-
-## Generate Project CI
-
-Run the setup script from a new repository created from this template:
-
-```bash
-node scripts/setup-ci.mjs
+```sh
+cargo install danmaku-renderer --locked --features cli
+danmaku-renderer danmaku.xml -o danmaku.ass
+danmaku-renderer danmaku.xml --mode naive --preset tv --display-area 3/4 -o danmaku.ass
 ```
 
-With no arguments, the script opens an interactive selector. For repeatable setup,
-pass modules explicitly:
+Use `-` for standard input. Output defaults to standard output. Use `--help` for the font, opacity, display-area and deduplication settings.
 
-```bash
-node scripts/setup-ci.mjs --tool js-ts --tool python --tool docker --tool markdown
-node scripts/setup-ci.mjs --all --benchmark --dry-run
+| Mode | Default preset | Placement |
+| --- | --- | --- |
+| `compact` (default) | `tv` | Groups repeated scrolling comments and uses their trajectories and timing to look ahead. Skips a comment if no space is available. |
+| `naive` | `original` | Uses BBDown's original input order and round-robin placement. |
+
+`original` uses the 1920 × 1080 BBDown layout, source font sizes and full opacity. `tv` scales source font sizes by 3, uses 70% opacity and confines comments to the upper half of the screen. Either mode accepts either preset. Explicit settings override the selected preset. `--display-area` accepts `1/4`, `1/2`, `3/4`, `1`, or other fractions and decimals in `(0, 1]`.
+
+`compact` groups identical scrolling text traveling in the same direction within 1.5 seconds of the first comment, appending a repeat count. Set `--dedup-window-ms 0` to disable grouping. Placement estimates text bounds because font selection happens in the player.
+
+## Use from Rust
+
+```toml
+[dependencies]
+danmaku-renderer = "0.1.0"
 ```
 
-The script writes `.github/workflows/ci.yml` plus the selected tool configs. It is
-idempotent when generated files have not changed. If a target file already exists
-with different content, the script refuses to overwrite it unless `--force` is
-provided. Use `--dry-run` to inspect planned writes first.
+```rust
+use danmaku_renderer::{RenderOptions, render_bilibili_xml};
 
-Supported modules:
-
-- `js-ts`: pnpm, ESLint, Prettier, Vite, and Vitest.
-- `python`: uv, Ruff, Pyright, and pytest.
-- `swift`: swift-format, SwiftLint, and `swift test`.
-- `go`: `gofmt`, `go vet`, and `go test`.
-- `rust`: `cargo fmt`, `cargo clippy`, and `cargo test`.
-- `github-actions`: actionlint.
-- `bash`: shfmt, shellcheck, and `bash -n`.
-- `markdown`: Prettier and markdownlint-cli2.
-- `docker`: hadolint and `docker buildx build --check`.
-
-`--benchmark` creates `scripts/benchmark.sh` only. It does not create or enable a
-benchmark workflow, and benchmark commands are not part of the default PR gate.
-The script includes benchmark entries for JavaScript/TypeScript, Python, Go, and
-Rust when those modules are selected.
-
-## After Creating a Repository
-
-1. Add the project source, tests, and license.
-2. Run `node scripts/setup-ci.mjs` and commit the generated CI/tooling files.
-3. Install or lock generated dependencies where applicable, such as `pnpm install`
-   for JavaScript/TypeScript or Markdown modules.
-4. Confirm both gate workflows and `.github/CODEOWNERS` are on the default
-   branch. Set the control-plane owner in CODEOWNERS to an eligible maintainer.
-5. Follow the [canonical v2 installation guide](https://github.com/Joey-Tools/codex-review-gate/blob/master/docs/install/human.md):
-   import or stage `rulesets/codex-review-gate.json` as Disabled, verify
-   `codex/github-review-gate` with a
-   separate harmless canary PR, then activate and read back the ruleset. Do not
-   require the v2 check while its workflow exists only on a feature branch.
-   If migrating an existing v1 repository, keep the old requirement active
-   until the v2 ruleset is verified Active, then remove only the legacy gate.
-
-## Optional GitHub Actions Variables
-
-- `CODEX_REVIEW_GATE_AUTO_REQUEST=true`: opt in to automatic Codex review
-  requests after a ready PR's verifier fails. It is disabled by default. The
-  action refetches the PR and rejects drafts before posting a request.
-- `CODEX_REVIEW_GATE_USE_UBUNTU_LATEST=true`: use `ubuntu-latest` when the
-  default `ubuntu-slim` runner is unsuitable.
-- `CODEX_REVIEW_GATE_LIMITS_PROFILE=expanded`: raise the bounded scan profile
-  for repositories with exceptionally large pull requests (default: `default`).
-
-Set these as organization or repository Actions variables; a repository value
-overrides an organization value with the same name.
-
-## Template Maintenance
-
-Run the generator tests with Node's built-in test runner:
-
-```bash
-node --test test/setup-ci.node-test.mjs
+let xml = r#"<i><d p="1.2,1,25,16777215">弹幕</d></i>"#;
+let mut options = RenderOptions::default();
+options.style.display_area = 0.75;
+let ass = render_bilibili_xml(xml, &options)?;
+# Ok::<(), danmaku_renderer::RenderError>(())
 ```
+
+`RenderOptions::for_mode` chooses the stated defaults for each mode. `options.style = StylePreset::Tv.into()` selects the TV preset explicitly. The renderer takes UTF-8 XML with a Bilibili `<i>` root. Advanced modes 7 and 8 are skipped.
+
+## Development and publication
+
+```sh
+cargo test --locked --no-default-features
+cargo test --locked --all-features
+cargo clippy --locked --all-features --all-targets -- -D warnings
+cargo test --locked --test libass -- --ignored
+```
+
+The libass check uses a local C compiler, `pkg-config`, libass headers, and a CJK font to inspect rendered pixels.
+
+The golden tests compare two [Bilibili fixtures](tests/fixtures/README.md) against snapshots from BBDown and Telegram. The library also exposes prefix rendering by Compact layout version so an application can verify previously generated ASS before replacing it.
+
+On GitHub, the publish workflow accepts a version from `master`, verifies the matching `v<version>` tag and Cargo package, and publishes from the protected `crates-io` environment. Set `CARGO_REGISTRY_TOKEN` in that environment for the first release and select `bootstrap` when dispatching. Subsequent releases use Trusted Publishing for `Joey-Project/danmaku-renderer`, `release.yml`, and the `crates-io` environment. Remove the bootstrap credential after the initial publication.
+
+Licensed under MIT. Original placement comes from [BBDown-rust](https://github.com/Joey-Project/BBDown-rust/commit/7c3e54d). Compact grouping and lookahead come from [Telegram-Video-Downloader](https://github.com/Joey-Project/Telegram-Video-Downloader/commit/9d0a5c3c82ffa957cbf33cbdf07dfba059e2cbdd).

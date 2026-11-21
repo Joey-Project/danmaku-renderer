@@ -9,3 +9,4 @@ out/
 target/
 __pycache__/
 *.py[cod]
+!/tests/fixtures/*.gz
